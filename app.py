@@ -1,4 +1,4 @@
-import fitz
+import fitz  # PyMuPDF
 import os
 import json
 import re
@@ -30,7 +30,7 @@ def extract_outline_from_pdf(file_path):
                     line_text += text
                     font_size = max(font_size, span["size"])
                     total_char_count += len(text)
-                    if span.get("flags", 0) & 16:  # bold
+                    if span.get("flags", 0) & 16:
                         bold_char_count += len(text)
                     font_sizes.append(span["size"])
 
@@ -55,6 +55,8 @@ def extract_outline_from_pdf(file_path):
         text = text_info["text"]
         font_size = text_info["font_size"]
         is_bold = text_info["is_bold"]
+        bbox = text_info["bbox"]
+        left_x = bbox[0]
 
         if len(text) > 100:
             return False
@@ -74,11 +76,16 @@ def extract_outline_from_pdf(file_path):
             bool(re.match(r'^\d+[\.\)]', text)) or
             text.endswith(':')
         )
+        left_margin_factor = left_x < 100  # Tune threshold based on layout
 
+        if is_bold and font_size == most_common_size:
+            return False
+
+        # Exclude common non-heading patterns
         if any(term in text.lower() for term in ['page', 'figure', 'table', '•', 'http', 'www']):
             return False
 
-        return sum([size_factor, bold_factor, format_factor]) >= 2
+        return sum([size_factor, bold_factor, format_factor, left_margin_factor]) >= 3
 
     potential_headings = [info for info in all_text_info if is_likely_heading(info)]
 
@@ -130,7 +137,7 @@ def extract_outline_from_pdf(file_path):
     }
 
 # Run on all PDFs in a folder
-if __name__ == "__main__":
+if _name_ == "_main_":
     input_dir = "/content/input"   # Input folder
     output_dir = "/content/output" # Output folder
     os.makedirs(output_dir, exist_ok=True)
